@@ -11,7 +11,7 @@ describe('Weekend Trip Planner', () => {
     expect(screen.getByText('Weekend Trip Planner')).toBeInTheDocument();
     expect(screen.getByLabelText('Day trip')).toBeInTheDocument();
     expect(screen.getByLabelText('2-day overnight')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Plan My Trip' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Plan my trip' })).toBeInTheDocument();
   });
 
   it('shows fallback when budget is too small to travel anywhere', () => {
@@ -24,10 +24,10 @@ describe('Weekend Trip Planner', () => {
       fireEvent.click(freeBusCheckbox);
     }
     
-    const submitButton = screen.getByRole('button', { name: 'Plan My Trip' });
+    const submitButton = screen.getByRole('button', { name: 'Plan my trip' });
     fireEvent.click(submitButton);
 
-    expect(screen.getByText('Budget Too Low!')).toBeInTheDocument();
+    expect(screen.getByText('Stay local this time')).toBeInTheDocument();
     expect(screen.getByText('Footdee (Fittie) Walk')).toBeInTheDocument();
   });
 
@@ -35,12 +35,12 @@ describe('Weekend Trip Planner', () => {
     const budgetInput = screen.getByRole('spinbutton');
     fireEvent.change(budgetInput, { target: { value: '50' } });
 
-    const submitButton = screen.getByRole('button', { name: 'Plan My Trip' });
+    const submitButton = screen.getByRole('button', { name: 'Plan my trip' });
     fireEvent.click(submitButton);
 
     // Should find a trip to somewhere, e.g. Stonehaven or Inverurie
-    expect(screen.queryByText('Budget Too Low!')).not.toBeInTheDocument();
-    expect(screen.getByText(/Trip to /)).toBeInTheDocument();
+    expect(screen.queryByText('Stay local this time')).not.toBeInTheDocument();
+    expect(screen.getByText('Leave Aberdeen')).toBeInTheDocument();
   });
 
   it('prioritizes interests when planning a trip', () => {
@@ -51,14 +51,14 @@ describe('Weekend Trip Planner', () => {
     const historyButton = screen.getByRole('button', { name: 'History' });
     fireEvent.click(historyButton);
 
-    const submitButton = screen.getByRole('button', { name: 'Plan My Trip' });
+    const submitButton = screen.getByRole('button', { name: 'Plan my trip' });
     fireEvent.click(submitButton);
 
-    expect(screen.queryByText('Budget Too Low!')).not.toBeInTheDocument();
-    expect(screen.getByText(/Trip to /)).toBeInTheDocument();
+    expect(screen.queryByText('Stay local this time')).not.toBeInTheDocument();
+    expect(screen.getByText('Leave Aberdeen')).toBeInTheDocument();
     // Verify an activity related to history is present.
     // Hard to check exact without knowing the generated plan, but we check there's an activity list.
-    expect(screen.getByText('Suggested Activities')).toBeInTheDocument();
+    expect(screen.getByText('Back to Aberdeen')).toBeInTheDocument();
   });
 
   it('adds overnight cost when 2-day overnight is selected', () => {
@@ -68,10 +68,10 @@ describe('Weekend Trip Planner', () => {
     const overnightRadio = screen.getByLabelText('2-day overnight');
     fireEvent.click(overnightRadio);
 
-    const submitButton = screen.getByRole('button', { name: 'Plan My Trip' });
+    const submitButton = screen.getByRole('button', { name: 'Plan my trip' });
     fireEvent.click(submitButton);
 
-    expect(screen.queryByText('Budget Too Low!')).not.toBeInTheDocument();
-    expect(screen.getByText(/Accommodation \(1 night hostel\/B&B\)/)).toBeInTheDocument();
+    expect(screen.queryByText('Stay local this time')).not.toBeInTheDocument();
+    expect(screen.getByText(/Stay the night in /)).toBeInTheDocument();
   });
 });

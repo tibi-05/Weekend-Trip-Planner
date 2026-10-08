@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { destinations, Destination, Activity, TripLength, Interest } from '../data/destinations';
 import { fallbacks } from '../data/fallback';
 
 const INTERESTS: Interest[] = ['Outdoors', 'History', 'Coastal', 'Food', 'Culture'];
+const LENGTHS: TripLength[] = ['Day trip', '2-day overnight'];
 
 interface TripPlan {
   destination: Destination;
@@ -12,27 +13,45 @@ interface TripPlan {
   overnightCost: number;
   activities: Activity[];
   totalCost: number;
+  budget: number;
 }
 
+// What was asked for when nothing fit, so the message doesn't change as the form is edited
+interface NoTrip {
+  budget: number;
+  overnight: boolean;
+}
+
+const gbp = (n: number) => `£${n.toFixed(2)}`;
+
 export default function Home() {
-  const [budget, setBudget] = useState<number>(50);
+  const [budgetText, setBudgetText] = useState('50');
   const [length, setLength] = useState<TripLength>('Day trip');
   const [selectedInterests, setSelectedInterests] = useState<Interest[]>([]);
   const [freeBus, setFreeBus] = useState<boolean>(false);
   const [plan, setPlan] = useState<TripPlan | null>(null);
-  const [showFallback, setShowFallback] = useState<boolean>(false);
+  const [noTrip, setNoTrip] = useState<NoTrip | null>(null);
+  const resultRef = useRef<HTMLElement>(null);
+
+  // On a phone the result is below the form, so bring it into view
+  useEffect(() => {
+    if ((plan || noTrip) && window.innerWidth < 1024) {
+      resultRef.current?.scrollIntoView?.({ block: 'start' });
+    }
+  }, [plan, noTrip]);
 
   const toggleInterest = (interest: Interest) => {
-    setSelectedInterests(prev => 
+    setSelectedInterests(prev =>
       prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]
     );
   };
 
   const generateTrip = (e: React.FormEvent) => {
     e.preventDefault();
-    setShowFallback(false);
+    setNoTrip(null);
     setPlan(null);
 
+    const budget = Math.max(0, Number(budgetText) || 0);
     const maxActivities = length === 'Day trip' ? 4 : 8;
     let bestPlan: TripPlan | null = null;
     let bestScore = -1;
@@ -76,7 +95,8 @@ export default function Home() {
             transportCost,
             overnightCost,
             activities: selectedActs,
-            totalCost
+            totalCost,
+            budget,
           };
         }
       }
@@ -85,136 +105,217 @@ export default function Home() {
     if (bestPlan) {
       setPlan(bestPlan);
     } else {
-      setShowFallback(true);
+      setNoTrip({ budget, overnight: length === '2-day overnight' });
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#f4f7f6] text-[#1c2b23] p-4 md:p-8 tartan-pattern font-sans">
-      <div className="max-w-2xl mx-auto space-y-8">
-        <header className="text-center p-6 bg-white rounded-xl shadow-md tartan-border">
-          <h1 className="text-4xl font-bold text-[#1c4b64] mb-2 font-serif">Weekend Trip Planner</h1>
-          <p className="text-[#4a6741] font-medium text-lg">Plan an affordable public transport trip from Aberdeen.</p>
-        </header>
-        
-        <form onSubmit={generateTrip} className="bg-white p-8 rounded-xl shadow-lg border border-[#e5e7eb] space-y-6 relative overflow-hidden">
-          <div>
-            <label className="block font-semibold mb-3 text-[#1c4b64] text-lg">Trip Length</label>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-slate-50 transition flex-1">
-                <input type="radio" name="length" value="Day trip" checked={length === 'Day trip'} onChange={() => setLength('Day trip')} className="accent-[#1c4b64] w-4 h-4" />
-                <span className="font-medium">Day trip</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-slate-50 transition flex-1">
-                <input type="radio" name="length" value="2-day overnight" checked={length === '2-day overnight'} onChange={() => setLength('2-day overnight')} className="accent-[#1c4b64] w-4 h-4" />
-                <span className="font-medium">2-day overnight</span>
-              </label>
-            </div>
+    <main className="flex-1">
+      <div className="mx-auto grid max-w-6xl gap-12 px-4 py-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-16 lg:py-16">
+        <form onSubmit={generateTrip} className="space-y-10">
+          <div className="space-y-4">
+            <h1 className="font-semibold text-sea">Weekend Trip Planner</h1>
+            <p className="text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-7xl">
+              Where can{' '}
+              <span className="whitespace-nowrap">
+                £
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="any"
+                  required
+                  aria-label="Budget in pounds"
+                  value={budgetText}
+                  onChange={e => setBudgetText(e.target.value)}
+                  className="budget-input border-b-[6px] border-gorse bg-transparent text-heather outline-none focus-visible:border-heather"
+                />
+              </span>{' '}
+              take you?
+            </p>
+            <p className="max-w-md text-lg text-ink/70">
+              Day trips and overnighters from Aberdeen by bus and train. No car needed.
+            </p>
           </div>
 
-          <div>
-            <label className="block font-semibold mb-3 text-[#1c4b64] text-lg">Budget (£)</label>
-            <input 
-              type="number" 
-              min="0" 
-              value={budget} 
-              onChange={(e) => setBudget(Number(e.target.value))}
-              className="w-full border-2 border-gray-200 focus:border-[#4a6741] focus:ring-0 rounded-lg p-3 text-lg transition outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-semibold mb-3 text-[#1c4b64] text-lg">Interests</label>
-            <div className="flex flex-wrap gap-3">
-              {INTERESTS.map(interest => (
-                <button
-                  type="button"
-                  key={interest}
-                  onClick={() => toggleInterest(interest)}
-                  className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition ${selectedInterests.includes(interest) ? 'bg-[#1c4b64] border-[#1c4b64] text-white shadow-md' : 'bg-white border-gray-200 text-gray-600 hover:border-[#1c4b64] hover:text-[#1c4b64]'}`}
+          <fieldset>
+            <legend className="mb-3 font-bold">How long have you got?</legend>
+            <div className="inline-flex rounded-full bg-white p-1 ring-1 ring-mist">
+              {LENGTHS.map(option => (
+                <label
+                  key={option}
+                  className="cursor-pointer rounded-full px-5 py-2.5 font-semibold text-ink/70 transition-colors has-checked:bg-ink has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-heather"
                 >
-                  {interest}
-                </button>
+                  <input
+                    type="radio"
+                    name="length"
+                    value={option}
+                    checked={length === option}
+                    onChange={() => setLength(option)}
+                    className="sr-only"
+                  />
+                  {option}
+                </label>
               ))}
             </div>
-          </div>
+          </fieldset>
 
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-            <label className="flex items-center gap-3 font-semibold cursor-pointer">
-              <input type="checkbox" checked={freeBus} onChange={(e) => setFreeBus(e.target.checked)} className="w-5 h-5 accent-[#4a6741] rounded" />
-              <span className="text-[#1c2b23]">I have an Under-22 / Free Bus Pass</span>
-            </label>
-            <p className="text-sm text-gray-500 mt-2 ml-8">Sets eligible bus fares to £0.</p>
-          </div>
+          <fieldset>
+            <legend className="font-bold">What are you into?</legend>
+            <p className="mb-3 text-sm text-ink/70">Pick any. Places with more of these come first.</p>
+            <div className="flex flex-wrap gap-2">
+              {INTERESTS.map(interest => {
+                const on = selectedInterests.includes(interest);
+                return (
+                  <button
+                    type="button"
+                    key={interest}
+                    aria-pressed={on}
+                    onClick={() => toggleInterest(interest)}
+                    className={`rounded-full border-2 px-4 py-2 font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-heather ${on ? 'border-heather bg-heather text-white' : 'border-mist bg-white text-ink/80 hover:border-heather'}`}
+                  >
+                    {interest}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
 
-          <button type="submit" className="w-full bg-[#4a6741] text-white font-bold py-4 rounded-lg hover:bg-[#3d5635] shadow-md transition text-lg flex justify-center items-center gap-2">
-            Plan My Trip
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={freeBus}
+              onChange={e => setFreeBus(e.target.checked)}
+              className="mt-0.5 size-5 shrink-0 accent-heather"
+            />
+            <span>
+              <span className="block font-bold">I have an Under-22 bus pass</span>
+              <span className="block text-sm text-ink/70">Bus fares become free. Trains still cost.</span>
+            </span>
+          </label>
+
+          <button
+            type="submit"
+            className="rounded-full bg-ink px-8 py-4 text-lg font-bold text-white transition-colors hover:bg-sea focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-heather"
+          >
+            Plan my trip
           </button>
         </form>
 
-        {plan && (
-          <div className="bg-white p-8 rounded-xl shadow-xl tartan-border">
-            <h2 className="text-3xl font-bold mb-3 text-[#1c4b64] font-serif">Trip to {plan.destination.name}</h2>
-            <p className="text-gray-700 mb-6 text-lg">{plan.destination.description}</p>
-            
-            <div className="space-y-6">
-              <div className="bg-[#f8faf9] p-5 rounded-lg border border-[#d3dfd8]">
-                <h3 className="font-bold text-lg mb-3 text-[#4a6741] uppercase tracking-wide text-sm">Transport & Accommodation</h3>
-                <ul className="space-y-2">
-                  <li className="flex justify-between items-center text-gray-800">
-                    <span>Transport: {plan.destination.transportType} <span className="text-gray-500 text-sm">(approx. {plan.destination.travelTime})</span></span>
-                    <span className="font-semibold text-[#1c4b64]">£{plan.transportCost.toFixed(2)}</span>
+        <section ref={resultRef} aria-live="polite" className="scroll-mt-4 self-start lg:sticky lg:top-8">
+          {plan && <PlanView key={plan.destination.id + plan.totalCost} plan={plan} />}
+
+          {noTrip && (
+            <div className="rounded-2xl bg-white p-6 ring-1 ring-mist sm:p-8">
+              <h2 className="text-3xl font-extrabold tracking-tight">Stay local this time</h2>
+              <p className="mt-2 text-ink/70">
+                {gbp(noTrip.budget)} doesn&apos;t cover a return fare{noTrip.overnight ? ' and a night away' : ''}.
+                Raise your budget, or try these free spots in Aberdeen.
+              </p>
+              <ul className="mt-6 space-y-5">
+                {fallbacks.map(f => (
+                  <li key={f.id} className="border-l-4 border-gorse pl-4">
+                    <p className="font-bold">{f.title}</p>
+                    <p className="text-ink/70">{f.description}</p>
                   </li>
-                  {length === '2-day overnight' && (
-                    <li className="flex justify-between items-center text-gray-800">
-                      <span>Accommodation (1 night hostel/B&B)</span>
-                      <span className="font-semibold text-[#1c4b64]">£{plan.overnightCost.toFixed(2)}</span>
-                    </li>
-                  )}
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-lg mb-3 text-[#4a6741] uppercase tracking-wide text-sm">Suggested Activities</h3>
-                <ul className="space-y-3">
-                  {plan.activities.map((act, i) => (
-                    <li key={i} className="flex justify-between items-center border-b border-gray-100 pb-3">
-                      <div>
-                        <span className="font-medium text-gray-800 block">{act.name}</span>
-                        <span className="text-xs text-gray-500">{act.tags.join(', ')}</span>
-                      </div>
-                      <span className="font-semibold text-[#1c4b64]">£{act.cost.toFixed(2)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="pt-6 flex justify-between items-end border-t-2 border-gray-100">
-                <span className="font-bold text-xl text-gray-800">Estimated Total:</span>
-                <span className="font-extrabold text-4xl text-[#8c2020]">£{plan.totalCost.toFixed(2)}</span>
-              </div>
-              <p className="text-xs text-center text-gray-400 mt-4 italic">All prices are estimates and may vary.</p>
+                ))}
+              </ul>
             </div>
-          </div>
-        )}
+          )}
 
-        {showFallback && (
-          <div className="bg-[#fff9f9] p-8 rounded-xl shadow-lg border-2 border-[#8c2020]">
-            <h2 className="text-2xl font-bold text-[#8c2020] mb-3 font-serif">Budget Too Low!</h2>
-            <p className="text-[#6b1818] mb-6 text-lg">
-              We couldn't find a trip outside the city that fits your budget. Here are some great free things to do right here in Aberdeen:
-            </p>
-            <ul className="space-y-4">
-              {fallbacks.map(f => (
-                <li key={f.id} className="bg-white p-5 rounded-lg shadow-sm border border-red-100">
-                  <span className="font-bold text-lg text-[#1c4b64] block mb-1">{f.title}</span>
-                  <span className="text-gray-700">{f.description}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+          {!plan && !noTrip && (
+            <div className="rounded-2xl border-2 border-dashed border-mist p-8">
+              <p className="font-bold">Every trip starts and ends in Aberdeen.</p>
+              <p className="mt-1 text-ink/70">
+                Set your budget, pick what you&apos;re into, and your route will show up here.
+              </p>
+            </div>
+          )}
+        </section>
       </div>
     </main>
+  );
+}
+
+function PlanView({ plan }: { plan: TripPlan }) {
+  const { destination: dest, transportCost, overnightCost, activities, totalCost, budget } = plan;
+  const activityCost = totalCost - transportCost - overnightCost;
+  const overnight = overnightCost > 0;
+  const pct = (n: number) => `${budget > 0 ? (n / budget) * 100 : 0}%`;
+  // Overnight trips split activities across the two days, with the stay in between
+  const day1 = overnight ? activities.slice(0, Math.ceil(activities.length / 2)) : activities;
+  const day2 = overnight ? activities.slice(day1.length) : [];
+  const ticketNote = transportCost === 0 && dest.returnFare > 0 ? 'free with your bus pass' : 'return ticket';
+
+  return (
+    <div className="rounded-2xl bg-white p-6 ring-1 ring-mist sm:p-8">
+      <h2 className="text-4xl font-extrabold tracking-tight">{dest.name}</h2>
+      <p className="mt-1 text-ink/70">{dest.description}</p>
+
+      <div className="mt-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+          <p>
+            <span className="text-2xl font-extrabold tabular-nums">{gbp(totalCost)}</span>
+            <span className="text-ink/70"> of {gbp(budget)}</span>
+          </p>
+          <p className="text-sm font-semibold tabular-nums text-sea">{gbp(budget - totalCost)} to spare</p>
+        </div>
+        <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-granite" aria-hidden="true">
+          <span className="bg-sea" style={{ width: pct(transportCost) }} />
+          <span className="bg-heather" style={{ width: pct(overnightCost) }} />
+          <span className="bg-gorse" style={{ width: pct(activityCost) }} />
+        </div>
+        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink/70">
+          <Legend colour="bg-sea" label="Travel" amount={transportCost} />
+          {overnight && <Legend colour="bg-heather" label="Stay" amount={overnightCost} />}
+          <Legend colour="bg-gorse" label="Things to do" amount={activityCost} />
+        </ul>
+      </div>
+
+      <ol className="route mt-8">
+        <Stop major title="Leave Aberdeen" detail={`${dest.transportType}, about ${dest.travelTime}, ${ticketNote}`} cost={transportCost} />
+        {day1.map(act => <ActivityStop key={act.name} act={act} />)}
+        {overnight && (
+          <Stop major title={`Stay the night in ${dest.name}`} detail="Hostel or budget B&B" cost={overnightCost} />
+        )}
+        {day2.map(act => <ActivityStop key={act.name} act={act} />)}
+        <Stop major title="Back to Aberdeen" detail={`About ${dest.travelTime}, on the same ticket`} />
+      </ol>
+
+      <p className="mt-8 text-sm text-ink/70">Prices are estimates. Check fares before you travel.</p>
+    </div>
+  );
+}
+
+function ActivityStop({ act }: { act: Activity }) {
+  return <Stop title={act.name} detail={act.tags.join(', ')} cost={act.cost} />;
+}
+
+function Stop({ title, detail, cost, major = false }: { title: string; detail: string; cost?: number; major?: boolean }) {
+  return (
+    <li className="relative pb-6 pl-9 last:pb-0">
+      <span
+        aria-hidden="true"
+        className={`absolute rounded-full ${major ? 'left-0 top-1 size-4 bg-ink ring-4 ring-white' : 'left-[3px] top-[7px] size-2.5 border-2 border-heather bg-white'}`}
+      />
+      <div className="flex justify-between gap-4">
+        <div>
+          <p className={major ? 'font-bold' : 'font-semibold'}>{title}</p>
+          <p className="text-sm text-ink/70">{detail}</p>
+        </div>
+        {cost !== undefined && (
+          <p className="shrink-0 font-semibold tabular-nums">{cost === 0 ? 'Free' : gbp(cost)}</p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function Legend({ colour, label, amount }: { colour: string; label: string; amount: number }) {
+  return (
+    <li className="flex items-center gap-1.5">
+      <span aria-hidden="true" className={`size-2.5 rounded-full ${colour}`} />
+      {label} {gbp(amount)}
+    </li>
   );
 }
